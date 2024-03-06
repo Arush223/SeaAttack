@@ -3,7 +3,7 @@ import os
 import time
 import random
 pygame.font.init()
-
+#giggity
 WIDTH, HEIGHT = 756, 473
 WIN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Sea Attack!")
