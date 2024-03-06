@@ -137,6 +137,7 @@ class Enemy(Ship):
     def move(self, vel):
         self.y += vel
 
+
     def shoot(self):
         if self.cool_down_counter == 0:
             laser = Laser(self.x+17, self.y, self.laser_img)
@@ -205,11 +206,8 @@ def main():
             else:
                 continue
 
-        if len(enemies) == 0:
+        if len(enemies) == 0: 
             level += 1
-            level_font = pygame.font.SysFont("impact", 60)
-            level_label = level_font.render(f"Level {level}", 1, (255,255,255))
-            WIN.blit(level_label, (WIDTH/2 - level_label.get_width()/2, 350))
             wave_length += 5
             for i in range(wave_length):
                 enemy = Enemy(random.randrange(50, WIDTH-100), random.randrange(-1500, -100), random.choice(["red", "blue", "green"]))
