@@ -2,8 +2,9 @@ import pygame
 import os
 import time
 import random
+
 pygame.font.init()
-#giggity
+
 WIDTH, HEIGHT = 756, 473
 WIN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Sea Attack!")
@@ -14,7 +15,10 @@ RED_SPACE_SHIP = pygame.image.load(os.path.join("Images", "red-ship-nobg.png"))
 GREEN_SPACE_SHIP = pygame.image.load(os.path.join("Images", "green-ship-nobg.png"))
 BLUE_SPACE_SHIP = pygame.image.load(os.path.join("Images", "blue-ship-nobg.png"))
 
-# Player ship
+# Boss Ship
+BOSS_SHIP = pygame.image.load(os.path.join("Images", "Boss-Ship.png")) 
+
+# Player ship 
 YELLOW_SPACE_SHIP = pygame.image.load(os.path.join("Images", "Ship3.png"))
 
 # Lasers
@@ -22,6 +26,7 @@ RED_LASER = pygame.image.load(os.path.join("Images", "red-laser-nobg.png"))
 GREEN_LASER = pygame.image.load(os.path.join("Images", "green-laser-nobg.png"))
 BLUE_LASER = pygame.image.load(os.path.join("Images", "blue-laser-nobg.png"))
 YELLOW_LASER = pygame.image.load(os.path.join("Images", "Caseoh-canon-ball-nobg2.png"))
+BOSS_LASER = pygame.image.load(os.path.join("Images", "Boss-Laser.png"))
 
 # Background
 BG = pygame.transform.scale(pygame.image.load(os.path.join("Images", "Sea-Background.png")), (WIDTH, HEIGHT))
@@ -153,10 +158,11 @@ def collide(obj1, obj2):
 def main():
     run = True
     FPS = 60
-    level = 0
+    level = 4
     lives = 5
     main_font = pygame.font.SysFont("impact", 30)
     lost_font = pygame.font.SysFont("impact", 60)
+    boss_font = pygame.font.SysFont("impact", 30)
 
     enemies = []
     wave_length = 5
@@ -192,6 +198,45 @@ def main():
 
         pygame.display.update()
 
+    def boss_level():
+        nonlocal run, level, enemies, player, lives, lost, lost_count
+
+        boss_ship = Enemy(WIDTH/2 - BOSS_SHIP.get_width()/2, -100, "red", health=500)
+        enemies.append(boss_ship)
+
+        while boss_ship.health > 0:
+            clock.tick(FPS)
+            redraw_window()
+
+            # Handle events
+            for event in pygame.event.get():  
+                if event.type == pygame.QUIT:
+                    quit()
+            
+            # Update boss ship's movements and attacks
+            boss_ship.move_lasers(laser_vel, player)
+            if random.randrange(0, 2*60) == 1:
+                boss_ship.shoot()
+            player.move_lasers(-laser_vel, [boss_ship])
+            redraw_window()
+
+            # Check for collisions and win condition
+            if collide(boss_ship, player):
+                player.health -= 10
+            for laser in player.lasers:
+                if laser.collision(boss_ship):
+                    boss_ship.health -= 10
+                    player.lasers.remove(laser)
+            if boss_ship.health <= 0:
+                enemies.remove(boss_ship)
+                win_message = boss_font.render("You Win!", 1, (255,255,255))
+                WIN.blit(win_message, (WIDTH/2 - win_message.get_width()/2, 350))
+                pygame.display.update()
+                time.sleep(3)
+                run = False
+                break
+
+
     while run:
         clock.tick(FPS)
         redraw_window()
@@ -208,10 +253,16 @@ def main():
 
         if len(enemies) == 0: 
             level += 1
-            wave_length += 5
-            for i in range(wave_length):
-                enemy = Enemy(random.randrange(50, WIDTH-100), random.randrange(-1500, -100), random.choice(["red", "blue", "green"]))
-                enemies.append(enemy)
+            if level == 6:
+                boss_label = boss_font.render("Boss Level!", 1, (255,255,255))
+                WIN.blit(boss_label, (WIDTH/2 - boss_label.get_width()/2, 350))
+                pygame.display.update()
+                boss_level()  # Call boss level function
+            else:
+                wave_length += 5
+                for i in range(wave_length):
+                    enemy = Enemy(random.randrange(50, WIDTH-100), random.randrange(-1500, -100), random.choice(["red", "blue", "green"]))
+                    enemies.append(enemy)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -229,7 +280,7 @@ def main():
         if keys[pygame.K_SPACE]:
             player.shoot()
 
-        for enemy in enemies[:]:
+        for enemy in enemies[:]: # this makes the ships move forward
             enemy.move(enemy_vel)
             enemy.move_lasers(laser_vel, player)
 
