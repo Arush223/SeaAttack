@@ -10,6 +10,9 @@ WIN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Sea Attack!")
 pygame.display.set_icon(pygame.image.load(os.path.join("Images", "Caseoh-canon-ball-nobg2.png")))
 
+# Title Logo
+TITLE_LOGO = pygame.image.load(os.path.join("Images", "Sea-Attack-Logo.png"))
+
 # Load images
 RED_SPACE_SHIP = pygame.image.load(os.path.join("Images", "red-ship-nobg.png"))  
 GREEN_SPACE_SHIP = pygame.image.load(os.path.join("Images", "green-ship-nobg.png"))
@@ -82,7 +85,7 @@ class Ship:
         if self.cool_down_counter >= self.COOLDOWN:
             self.cool_down_counter = 0
         elif self.cool_down_counter > 0:
-            self.cool_down_counter += 1.35
+            self.cool_down_counter += 1.1
 
     def shoot(self):
         if self.cool_down_counter == 0:
@@ -115,7 +118,9 @@ class Player(Ship):
                 for obj in objs:
                     if laser.collision(obj):
                         objs.remove(obj)
-                        if laser in self.lasers:
+                        if isinstance(obj, Boss):
+                            obj.health -= 10
+                        if laser in self.lasers: # This line of code is how the hit is registered.
                             self.lasers.remove(laser)
 
     def draw(self, window):
@@ -150,6 +155,46 @@ class Enemy(Ship):
             self.cool_down_counter = 1
 
 
+class Boss(Ship):
+    def __init__(self, x, y, health=300):
+        super().__init__(x, y, health)
+        self.ship_img = BOSS_SHIP
+        self.laser_img = BOSS_LASER
+        self.mask = pygame.mask.from_surface(self.ship_img)
+        self.vel = 4  # Boss ship velocity
+        self.direction = 1  # Initial direction (1 for right, -1 for left)
+        self.max_health = health
+        self.health = health
+
+    def move(self):
+        # Check if boss ship reaches the right edge or left edge of the screen
+        if self.x + self.vel >= WIDTH - self.ship_img.get_width() or self.x + self.vel <= 0:
+            self.direction *= -1  # Change direction
+        self.x += self.vel * self.direction  # Move horizontally
+
+    def healthbar(self, window):
+        pygame.draw.rect(window, (255,0,0), (self.x, self.y + self.ship_img.get_height() + 10, self.ship_img.get_width(), 10))
+        pygame.draw.rect(window, (0,255,0), (self.x, self.y + self.ship_img.get_height() + 10, self.ship_img.get_width() * (self.health/self.max_health), 10))
+
+    def draw(self, window):
+        window.blit(self.ship_img, (self.x, self.y))
+        self.healthbar(window)
+        for laser in self.lasers:
+            laser.draw(window)
+
+    def move_lasers(self, vel, obj):
+        self.cooldown()
+        for laser in self.lasers[:]:  # Use a copy of the list to avoid modifying it while iterating
+            laser.move(vel)
+            if laser.off_screen(HEIGHT):
+                self.lasers.remove(laser)
+            elif laser.collision(obj):
+                self.lasers.remove(laser)
+                obj.health -= 10
+                if isinstance(obj, Player):  # Only damage player
+                    obj.health -= 10
+
+
 def collide(obj1, obj2):
     offset_x = obj2.x - obj1.x
     offset_y = obj2.y - obj1.y
@@ -158,11 +203,11 @@ def collide(obj1, obj2):
 def main():
     run = True
     FPS = 60
-    level = 4
+    level = 5 
     lives = 5
     main_font = pygame.font.SysFont("impact", 30)
     lost_font = pygame.font.SysFont("impact", 60)
-    boss_font = pygame.font.SysFont("impact", 30)
+    boss_font = pygame.font.SysFont("impact", 60)
 
     enemies = []
     wave_length = 5
@@ -180,62 +225,89 @@ def main():
 
     def redraw_window():
         WIN.blit(BG, (0,0))
-        # draw text
+        # Draw text
         lives_label = main_font.render(f"Lives: {lives}", 1, (255,255,255))
         level_label = main_font.render(f"Level: {level}", 1, (255,255,255))
-
         WIN.blit(lives_label, (10, 10))
         WIN.blit(level_label, (WIDTH - level_label.get_width() - 10, 10))
 
+        # Draw enemies
         for enemy in enemies:
             enemy.draw(WIN)
 
+        # Draw player and boss if it's a boss level
         player.draw(WIN)
+        for enemy in enemies:
+            if isinstance(enemy, Boss):
+                enemy.draw(WIN)
+                enemy.healthbar(WIN)  # Call healthbar for the boss
 
+        # Draw lost label if the game is lost
         if lost:
             lost_label = lost_font.render("You Lost!!", 1, (255,255,255))
             WIN.blit(lost_label, (WIDTH/2 - lost_label.get_width()/2, 350))
 
         pygame.display.update()
 
+    
     def boss_level():
         nonlocal run, level, enemies, player, lives, lost, lost_count
 
-        boss_ship = Enemy(WIDTH/2 - BOSS_SHIP.get_width()/2, -100, "red", health=500)
+        boss_ship = Boss(WIDTH/2 - BOSS_SHIP.get_width()/2, 0)
         enemies.append(boss_ship)
 
         while boss_ship.health > 0:
             clock.tick(FPS)
             redraw_window()
-
-            # Handle events
+            # Handle events and player input
             for event in pygame.event.get():  
                 if event.type == pygame.QUIT:
                     quit()
+                # Handle other events if necessary
             
-            # Update boss ship's movements and attacks
-            boss_ship.move_lasers(laser_vel, player)
-            if random.randrange(0, 2*60) == 1:
-                boss_ship.shoot()
-            player.move_lasers(-laser_vel, [boss_ship])
-            redraw_window()
+            keys = pygame.key.get_pressed()
+            if keys[pygame.K_a] and player.x - player_vel > 0: # left
+                player.x -= player_vel
+            if keys[pygame.K_d] and player.x + player_vel + player.get_width() < WIDTH: # right
+                player.x += player_vel
+            if keys[pygame.K_w] and player.y - player_vel > 0: # up
+                player.y -= player_vel
+            if keys[pygame.K_s] and player.y + player_vel + player.get_height() + 15 < HEIGHT: # down
+                player.y += player_vel
+            if keys[pygame.K_SPACE]:
+                player.shoot()
 
-            # Check for collisions and win condition
+            # Update boss ship's movements and attacks
+            boss_ship.move()  # Move boss ship
+            boss_ship.move_lasers(laser_vel, player)
+            if random.randrange(0, 2*FPS) == 1:
+                boss_ship.shoot() 
+            player.move_lasers(-laser_vel, [boss_ship])
+
+            # Check for collisions with boss ship
             if collide(boss_ship, player):
                 player.health -= 10
-            for laser in player.lasers:
-                if laser.collision(boss_ship):
+
+            # Check for collisions between player lasers and boss ship
+            for laser in player.lasers[:]:
+                if collide(laser, boss_ship):  # Use collide function instead of laser.collision
                     boss_ship.health -= 10
                     player.lasers.remove(laser)
+
+
+            # Check if boss ship's health reaches zero
             if boss_ship.health <= 0:
                 enemies.remove(boss_ship)
-                win_message = boss_font.render("You Win!", 1, (255,255,255))
-                WIN.blit(win_message, (WIDTH/2 - win_message.get_width()/2, 350))
+                time.sleep(1)
+                win_message = boss_font.render("You Win!", 1, (255, 255, 255))
+                WIN.blit(win_message, (WIDTH / 2 - win_message.get_width() / 2, 350))
                 pygame.display.update()
                 time.sleep(3)
                 run = False
-                break
+                main_menu()
 
+
+        
 
     while run:
         clock.tick(FPS)
@@ -255,8 +327,13 @@ def main():
             level += 1
             if level == 6:
                 boss_label = boss_font.render("Boss Level!", 1, (255,255,255))
-                WIN.blit(boss_label, (WIDTH/2 - boss_label.get_width()/2, 350))
+                text_width = boss_label.get_width()
+                text_height = boss_label.get_height()
+                text_x = WIDTH/2 - text_width/2
+                text_y = HEIGHT/2 - text_height/2
+                WIN.blit(boss_label, (text_x, text_y))
                 pygame.display.update()
+                time.sleep(2)
                 boss_level()  # Call boss level function
             else:
                 wave_length += 5
@@ -301,12 +378,13 @@ def main_menu():
     run = True
     while run:
         WIN.blit(BG, (0,0))
-        subtitle_label = title_font.render("Use WASD to move and Spacebar to shoot", 1, (255,255,255))
-        smaller_title_label = title_font.render("If you let 5 ships get past you, you die!", 1, (255,255,255))
+        WIN.blit(TITLE_LOGO, (WIDTH/2 - TITLE_LOGO.get_width()/2, 50))
+        subtitle_label = title_font.render("Use WASD to move and Spacebar to shoot", 1, (153, 255, 255))
+        smaller_title_label = title_font.render("If you let 5 ships get past you, you die!", 1, (204,255,255))
         title_label = title_font.render("Press space to begin...", 1, (255,255,255))
-        WIN.blit(subtitle_label, (WIDTH/2 - subtitle_label.get_width()/2, HEIGHT/2 - subtitle_label.get_height()/2))
-        WIN.blit(smaller_title_label, (WIDTH/2 - smaller_title_label.get_width()/2, HEIGHT/2 - subtitle_label.get_height()/2 - smaller_title_label.get_height()))
-        WIN.blit(title_label, (WIDTH/2 - title_label.get_width()/2, HEIGHT/2 - subtitle_label.get_height()/2 - smaller_title_label.get_height() - title_label.get_height()))
+        WIN.blit(subtitle_label, (WIDTH/2 - subtitle_label.get_width()/2, HEIGHT/2 + subtitle_label.get_height()))
+        WIN.blit(smaller_title_label, (WIDTH/2 - smaller_title_label.get_width()/2, HEIGHT/2 + subtitle_label.get_height() + smaller_title_label.get_height()))
+        WIN.blit(title_label, (WIDTH/2 - title_label.get_width()/2, HEIGHT/2 + subtitle_label.get_height() + smaller_title_label.get_height() + title_label.get_height()))
         pygame.display.update()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -316,5 +394,4 @@ def main_menu():
                     main()
     pygame.quit()
 
-
-main_menu()
+main_menu() 
