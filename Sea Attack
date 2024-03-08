@@ -203,7 +203,7 @@ def collide(obj1, obj2):
 def main():
     run = True
     FPS = 60
-    level = 5 
+    level = 0 
     lives = 5
     main_font = pygame.font.SysFont("impact", 30)
     lost_font = pygame.font.SysFont("impact", 60)
