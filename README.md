@@ -3,7 +3,8 @@
 <h1>Welcome to Sea Attack!</h1>
 
 <p>This project was created by Alexzander Zhang and Aarush Jagtap for the March 2024 BC Hackathon.</p>
-
+<p>Won first place in the Hackathon! Devpost: https://devpost.com/software/sea-attack </p>
+ 
 <p><strong>Video Demo:</strong> <a href="https://youtu.be/q914OKhtUxU">Watch here</a></p>
 
 <h2>Screenshots:</h2>
